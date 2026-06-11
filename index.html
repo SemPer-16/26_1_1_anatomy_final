@@ -591,16 +591,29 @@
       const svg = dotChartSvg;
       const width = 340;
       const height = 240;
-      const margin = { top: 16, right: 18, bottom: 20, left: 48 };
+      const margin = { top: 16, right: 18, bottom: 34, left: 48 };
+      const chartWidth = width - margin.left - margin.right;
       const chartHeight = height - margin.top - margin.bottom;
-      const xCenter = width / 2;
+      const numericIds = students.map((entry, index) => {
+        const parsed = Number(entry.id);
+        return Number.isFinite(parsed) ? parsed : index;
+      });
+      const minId = Math.min(...numericIds);
+      const maxId = Math.max(...numericIds);
 
       const yForScore = score => {
         const ratio = (score - minScore) / (topScore - minScore || 1);
         return margin.top + chartHeight - ratio * chartHeight;
       };
 
-      let content = `<line x1="${xCenter}" y1="${margin.top}" x2="${xCenter}" y2="${height - margin.bottom}" stroke="#d7e0e7" stroke-width="2" />`;
+      const xForId = id => {
+        const parsed = Number(id);
+        const safeId = Number.isFinite(parsed) ? parsed : minId;
+        const ratio = (safeId - minId) / (maxId - minId || 1);
+        return margin.left + ratio * chartWidth;
+      };
+
+      let content = `<line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" stroke="#d7e0e7" stroke-width="2" />`;
 
       for (let score = Math.floor(minScore / 5) * 5; score <= Math.ceil(topScore / 5) * 5; score += 5) {
         const y = yForScore(Math.max(minScore, Math.min(topScore, score)));
@@ -608,27 +621,29 @@
         content += svgText(10, y + 4, `${score}`, 'font-size="10" fill="#667786"');
       }
 
-      const grouped = {};
-      students.forEach((entry, index) => {
-        const key = entry.score.toFixed(2);
-        grouped[key] = grouped[key] || [];
-        grouped[key].push({ ...entry, index });
+      const xTicks = [minId, minId + (maxId - minId) / 3, minId + ((maxId - minId) * 2) / 3, maxId];
+      xTicks.forEach(value => {
+        const x = xForId(value);
+        content += `<line x1="${x}" y1="${margin.top}" x2="${x}" y2="${height - margin.bottom}" stroke="#f1f5f8" stroke-width="1" />`;
+        content += svgText(x, height - 10, `${Math.round(value)}`, 'text-anchor="middle" font-size="9" fill="#667786"');
       });
 
-      Object.values(grouped).forEach(group => {
-        const score = group[0].score;
-        const y = yForScore(score);
-        group.forEach((entry, idx) => {
-          const offset = (idx - (group.length - 1) / 2) * 12;
-          const x = xCenter + offset;
-          const isTarget = entry.id === student.id;
-          content += `<circle class="dot-point" data-student="${entry.id}" cx="${x}" cy="${y}" r="${isTarget ? 8 : 5.2}" fill="${isTarget ? "#de5c4b" : "#85c1e9"}" stroke="${isTarget ? "#ffffff" : "transparent"}" stroke-width="2"><title>${entry.id} (${formatNumber(entry.score)}점)</title></circle>`;
-        });
+      students.forEach((entry, index) => {
+        const baseX = xForId(entry.id);
+        const y = yForScore(entry.score);
+        const jitter = ((index % 3) - 1) * 4;
+        const x = Math.max(margin.left + 4, Math.min(width - margin.right - 4, baseX + jitter));
+        const isTarget = entry.id === student.id;
+        content += `<circle class="dot-point" data-student="${entry.id}" cx="${x}" cy="${y}" r="${isTarget ? 8 : 5.2}" fill="${isTarget ? "#de5c4b" : "#85c1e9"}" stroke="${isTarget ? "#ffffff" : "transparent"}" stroke-width="2"><title>${entry.id} (${formatNumber(entry.score)}점)</title></circle>`;
       });
+
+      const studentX = xForId(student.id);
+      content += `<line x1="${studentX}" y1="${margin.top}" x2="${studentX}" y2="${height - margin.bottom}" stroke="#de5c4b" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.55" />`;
 
       const meanY = yForScore(mean);
       content += `<line x1="${margin.left}" y1="${meanY}" x2="${width - margin.right}" y2="${meanY}" stroke="#203548" stroke-width="2" stroke-dasharray="5 5" />`;
       content += svgText(width - 8, meanY - 5, `평균 ${mean.toFixed(2)}`, 'text-anchor="end" font-size="10" fill="#203548" font-weight="700"');
+      content += svgText(width - 8, margin.top + 10, `비밀번호`, 'text-anchor="end" font-size="10" fill="#667786"');
       svg.innerHTML = content;
     }
 
