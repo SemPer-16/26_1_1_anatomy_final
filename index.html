@@ -69,6 +69,27 @@
       gap: 8px;
     }
 
+    .search-suggestions {
+      margin-top: 10px;
+      display: none;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .search-suggestions.visible {
+      display: flex;
+    }
+
+    .suggestion-btn {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     .search {
       width: 100%;
       border: 0;
@@ -341,9 +362,10 @@
       <div class="hero-card">
         <h1 class="hero-title">해부학 성적</h1>
         <div class="search-wrap">
-          <input id="searchInput" class="search" type="text" placeholder="비밀번호 입력..." list="studentIds" inputmode="numeric" autocomplete="off">
+          <input id="searchInput" class="search" type="text" placeholder="비밀번호 입력..." inputmode="numeric" autocomplete="off">
           <button id="showBtn" class="action-btn" type="button">조회</button>
         </div>
+        <div class="search-suggestions" id="searchSuggestions"></div>
         <div class="chips">
           <button class="chip" type="button" data-sample="6740">상위권</button>
           <button class="chip" type="button" data-sample="6459">중앙권</button>
@@ -351,7 +373,6 @@
           <button class="chip" id="resetBtn" type="button">초기화</button>
         </div>
       </div>
-      <datalist id="studentIds"></datalist>
     </div>
 
     <section class="panel status">
@@ -437,8 +458,8 @@
     const topScore = Math.max(...scores);
     const scaleMax = Math.ceil(topScore / 5) * 5;
 
-    const datalist = document.getElementById("studentIds");
     const searchInput = document.getElementById("searchInput");
+    const searchSuggestions = document.getElementById("searchSuggestions");
     const showBtn = document.getElementById("showBtn");
     const resetBtn = document.getElementById("resetBtn");
     const reportCard = document.getElementById("reportCard");
@@ -446,12 +467,6 @@
     const statusTitle = document.getElementById("statusTitle");
     const statusCopy = document.getElementById("statusCopy");
     const matchList = document.getElementById("matchList");
-
-    students.forEach(student => {
-      const option = document.createElement("option");
-      option.value = student.id;
-      datalist.appendChild(option);
-    });
 
     function formatNumber(value) {
       return Number.isInteger(value) ? String(value) : value.toFixed(2);
@@ -491,6 +506,28 @@
         .filter(student => student.id.includes(normalized))
         .map(student => student.id)
         .slice(0, 12);
+    }
+
+    function renderSearchSuggestions(matches) {
+      searchSuggestions.innerHTML = "";
+      if (!matches.length) {
+        searchSuggestions.classList.remove("visible");
+        return;
+      }
+
+      matches.slice(0, 5).forEach(id => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "suggestion-btn";
+        button.textContent = id;
+        button.addEventListener("click", () => {
+          searchInput.value = id;
+          renderStudentByQuery(id);
+        });
+        searchSuggestions.appendChild(button);
+      });
+
+      searchSuggestions.classList.add("visible");
     }
 
     function renderStatsTable(student) {
@@ -656,6 +693,7 @@
     function renderStudentByQuery(query) {
       const exact = students.find(student => student.id === query.trim());
       if (exact) {
+        renderSearchSuggestions([]);
         renderStudent(exact);
         return;
       }
@@ -664,21 +702,25 @@
       reportCard.classList.remove("visible");
 
       if (!query.trim()) {
+        renderSearchSuggestions([]);
         setStatus("비밀번호를 입력하세요", "일치하는 표본이 있으면 아래 모바일 리포트가 바로 갱신됩니다.");
         return;
       }
 
       if (matches.length === 1) {
+        renderSearchSuggestions([]);
         const student = students.find(entry => entry.id === matches[0]);
         renderStudent(student);
         return;
       }
 
       if (matches.length > 1) {
+        renderSearchSuggestions(matches);
         setStatus("여러 후보가 있습니다", "아래 비밀번호 버튼 중 하나를 선택하세요.", matches);
         return;
       }
 
+      renderSearchSuggestions([]);
       setStatus("일치하는 표본이 없습니다", "입력값을 다시 확인해 주세요.");
     }
 
@@ -694,6 +736,7 @@
     resetBtn.addEventListener("click", () => {
       searchInput.value = "";
       reportCard.classList.remove("visible");
+      renderSearchSuggestions([]);
       setStatus("비밀번호를 입력하세요", "일치하는 표본이 있으면 아래 모바일 리포트가 바로 갱신됩니다.");
       searchInput.focus();
     });
